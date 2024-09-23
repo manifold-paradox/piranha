@@ -1,0 +1,516 @@
+import pygame
+import os
+import random
+import sys
+import button
+from random import choices
+
+pygame.init()
+
+#button class
+class Button():
+	def __init__(self, x, y, image, scale):
+		width = image.get_width()
+		height = image.get_height()
+		self.image = pygame.transform.scale(image, (int(width * scale), int(height * scale)))
+		self.rect = self.image.get_rect()
+		self.rect.topleft = (x, y)
+		self.clicked = False
+
+	def draw(self, surface):
+		action = False
+		#get mouse position
+		pos = pygame.mouse.get_pos()
+
+		#check mouseover and clicked conditions
+		if self.rect.collidepoint(pos):
+			if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
+				self.clicked = True
+				action = True
+
+		if pygame.mouse.get_pressed()[0] == 0:
+			self.clicked = False
+
+		#draw button on screen
+		surface.blit(self.image, (self.rect.x, self.rect.y))
+
+		return action
+    
+# initializare
+pygame.font.init()
+score=0
+WIDTH, HEIGHT = 1680, 1050
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Piranha")
+score_font = pygame.font.SysFont('Corbel', 35)
+
+# Load Images
+menu_img = pygame.image.load(os.path.join("assets", "menu.png"))
+player_img = pygame.image.load(os.path.join("assets/mancator_peste", "model_player2.png"))
+inamic1 = pygame.image.load(os.path.join("assets/mancator_peste", "inamic1.svg"))
+inamic2 = pygame.image.load(os.path.join("assets/mancator_peste", "inamic2.svg"))
+inamic3 = pygame.image.load(os.path.join("assets/mancator_peste", "inamic3.svg"))
+
+# mentine ratia de la imagini
+const_img_w = player_img.get_rect().width
+const_img_h = player_img.get_rect().height
+player_img_w = player_img.get_rect().width
+player_img_h = player_img.get_rect().height
+
+# scaleaza imaginile
+menu_img = pygame.transform.scale(menu_img, (400, 400))
+player_img = pygame.transform.scale(player_img, (player_img_w * 0.1, player_img_h * 0.1))
+inamic1 = pygame.transform.scale(inamic1, (25, 25))
+inamic2 = pygame.transform.scale(inamic2, (100, 75))
+inamic3 = pygame.transform.scale(inamic3, (200, 200))
+
+
+# fundal
+bg = pygame.transform.scale(pygame.image.load(os.path.join("assets/mancator_peste", "apa.png")), (WIDTH, HEIGHT))
+
+# fonturi si mesaje
+big_font = pygame.font.SysFont('Corbel', 60)
+small_font = pygame.font.SysFont('Corbel', 35)
+game_over_msg = big_font.render("Ai fost mancat", True, "red")
+game_over_msg_2 = small_font.render("Click ca sa reincerci", True, "red")
+
+
+
+# clase
+class Peste:
+
+   def __init__(self, x, y): #pozitia in coorodonate xOy
+       self.x = x
+       self.y = y
+       self.Peste_img = None
+
+   def draw(self, window):
+       window.blit(self.Peste_img, (self.x, self.y))
+
+   def get_width(self):
+       return self.Peste_img.get_width()
+
+   def get_height(self):
+       return self.Peste_img.get_height()
+
+
+class Player(Peste):
+   def __init__(self, x, y, width, height):
+       super().__init__(x, y)
+       self.Peste_img = player_img
+       self.height = height
+       self.width = width
+       self.mask = pygame.mask.from_surface(self.Peste_img)
+       
+
+   def increase_size(self, width, height): #functia de incrementare marime
+       self.width += width * player_img_w
+       self.height += height * player_img_h
+       self.Peste_img = pygame.transform.scale(player_img, (self.width, self.height))
+       self.mask = pygame.mask.from_surface(self.Peste_img)
+
+   def decrease_size(self, width, height): #functia de decrementare marime
+       self.width -= width * player_img_w
+       self.height -= height * player_img_h
+       self.Peste_img = pygame.transform.scale(player_img, (self.width, self.height))
+       self.mask = pygame.mask.from_surface(self.Peste_img)
+       
+   def set_size(self, self_width, self_height):
+       self.Peste_img = pygame.transform.scale(player_img, (self.width, self.height))
+       self.mask = pygame.mask.from_surface(self.Peste_img)
+    
+    
+       
+
+
+class Inamic_Peste(Peste):
+   IMAGE_MAP = [inamic2, inamic3, inamic1]
+
+   def __init__(self, x, y, img):
+       super().__init__(x, y)
+       self.Peste_img = self.IMAGE_MAP[img]
+       self.mask = pygame.mask.from_surface(self.Peste_img)
+
+   def move(self, vel):
+       self.x += vel
+
+
+def Ciocnire(obj1, obj2):
+   offset_x = obj2.x - obj1.x
+   offset_y = obj2.y - obj1.y
+   return obj1.mask.overlap(obj2.mask, (offset_x, offset_y)) is not None
+
+
+   
+
+
+# declarare
+running = False
+lost = False
+FPS = 60
+clock = pygame.time.Clock()
+player_size_w = const_img_w * 0.1
+player_size_h = const_img_h * 0.1
+player = Player(300, 630, player_size_w, player_size_h)
+player_speed = 6
+Inamici = []
+wave_length = 3
+Inamic_start_pos = [0, WIDTH]
+
+
+#pozitie de start
+player.x = WIDTH / 2
+player.y = HEIGHT / 2
+
+
+score_max = open("assets\scor.txt", 'r').read()
+
+score_max=int(score_max)
+
+
+score_maxy=0
+ 
+
+def redraw_window():
+   global score
+   global lost
+   global restart
+   global player
+   global score_maxy
+   global score_max
+   global player_size_h
+   global player_size_w
+   global score_font
+   # Add background image
+   screen.blit(bg, (0, 0))
+   # Draw Inamici
+   for Inamic in Inamici:
+       Inamic.draw(screen)
+   # Place ship on screen
+   player.draw(screen)
+   
+   menu_text = score_font.render("ESC - Main menu", True, (255, 255, 255))
+   screen.blit(menu_text, (10, 1010))
+   restart_text = score_font.render("R - Restart", True, (255, 255, 255))
+   screen.blit(restart_text, (300, 1010))
+   full_text = score_font.render("F - Fullscreen", True, (255, 255, 255))
+   screen.blit(full_text, (500,1010))
+   score_text = score_font.render("Scor: " + str(score), True, (255, 255, 255))
+   screen.blit(score_text, (10, 10))
+
+   
+   
+
+   
+               
+
+       
+   # Check for game over
+   if lost: 
+       score_maxy=score
+       if(score_maxy>score_max):
+         score_max=score_maxy
+         f = open("assets\scor.txt", "w")
+         score_string = str(score_max)
+         f.write(score_string)
+         f.close()
+       game_over_msg_5 = score_font.render("Scor maxim: " + str(score_max), True, "white")
+       
+       game_over_msg_3 = score_font.render("Scor final: " + str(score), True, "red")
+       screen.fill((0, 0, 0))
+       screen.blit(game_over_msg_5, (750, 200))
+       screen.blit(game_over_msg, (500, 200))
+       screen.blit(game_over_msg_2, (100, 470))
+       screen.blit(game_over_msg_3, (100, 430))
+       player = Player(WIDTH/2, HEIGHT/2, 0.1, 0.1)
+       
+       
+       for event in pygame.event.get():
+           if event.type == pygame.QUIT:
+               sys.exit()
+           if event.type == pygame.MOUSEBUTTONDOWN:
+               lost = False
+               
+               score=0
+               Inamici.clear()
+               player_size_w = const_img_w * 0.1
+               player_size_h = const_img_h * 0.1
+               player = Player(1000, 450, player_size_w, player_size_h)
+           
+               
+               
+               
+               
+   # Update screen
+   pygame.display.update()
+meniu = True
+menu_state = "main"
+
+play_img = pygame.image.load("assets/play.png").convert_alpha()
+quit_img = pygame.image.load("assets/quit.png").convert_alpha()
+easy_img = pygame.image.load("assets/easy.png").convert_alpha()
+normal_img = pygame.image.load("assets/normal.png").convert_alpha()
+hard_img = pygame.image.load("assets/hard.png").convert_alpha()
+back_img = pygame.image.load("assets/back.png").convert_alpha()
+
+play_button = button.Button(100, 400, play_img, 0.8)
+quit_button = button.Button(100, 600, quit_img, 0.8)
+easy_button = button.Button(450, 100, easy_img, 0.8)
+normal_button = button.Button(400, 300, normal_img, 0.8)
+hard_button = button.Button(450, 500, hard_img, 0.8)
+back_button = button.Button(450, 750, back_img, 0.8)
+
+while meniu:
+    screen.blit(bg, (0, 0))
+    
+    if menu_state == "main":
+      screen.blit(menu_img, (600,200))
+      #butoane meniu
+      if play_button.draw(screen):
+        menu_state = "dificultate"
+      if quit_button.draw(screen):
+        meniu = False
+    score_maxy=score
+    if(score_maxy>score_max):
+        score_max=score_maxy
+        f = open("assets\scor.txt", "w")
+        score_string = str(score_max)
+        f.write(score_string)
+        f.close()
+        
+    if menu_state == "main":
+        scoremax_text = score_font.render("Scor maxim: " + str(score_max),True,(255, 255, 255))
+        screen.blit(scoremax_text, (100,800))
+    
+    if menu_state == "dificultate":
+      #butoane de dificultate
+      bg_img = pygame.image.load(os.path.join("assets", "bg.png"))
+      screen.blit(bg_img, (300,25))
+      if easy_button.draw(screen):
+        diff = "easy"
+        meniu = False
+        running = True
+        score=0
+        Inamici.clear()
+        player.x=900
+        player.y=450
+        while player.Peste_img.get_width() > (player_img_w * 0.1):
+            player.decrease_size(0.1, 0.1)
+            player_img = player.Peste_img
+        
+      if normal_button.draw(screen):
+        diff = "normal"
+        meniu = False
+        running = True
+        score=0
+        Inamici.clear()
+        player.x=900
+        player.y=450
+        while player.Peste_img.get_width() > (player_img_w * 0.1):
+            player.decrease_size(0.1, 0.1)
+            player_img = player.Peste_img
+            
+      if hard_button.draw(screen):
+        diff = "hard"
+        meniu = False
+        running = True
+        score=0
+        Inamici.clear()
+        player.x=900
+        player.y=450
+        while player.Peste_img.get_width() > (player_img_w * 0.1):
+            player.decrease_size(0.1, 0.1)
+            player_img = player.Peste_img
+            
+      if back_button.draw(screen):
+        menu_state = "main"
+    pygame.display.update()
+    for event in pygame.event.get():
+    
+     if event.type == pygame.QUIT:
+      meniu = False
+    
+
+
+ # bucla de joc
+    while running:
+     clock.tick(FPS)
+     redraw_window()
+     keys = pygame.key.get_pressed()
+    
+
+
+    
+     # verifica inchiderea ferestrei
+     for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            sys.exit()
+                
+                
+                
+     # controalele jucatorului
+     keys = pygame.key.get_pressed()
+     if keys[pygame.K_RIGHT] and player.get_width() + player.x < WIDTH:
+        player.x += player_speed
+        player.Peste_img = player_img
+     if keys[pygame.K_LEFT] and player.x - player_speed >= 0:
+        player.x -= player_speed
+        player.Peste_img = pygame.transform.flip(player_img, True, False)
+     if keys[pygame.K_UP] and player.y - player_speed >= 0:
+        player.y -= player_speed
+     if keys[pygame.K_DOWN] and player.y + player.get_height() < HEIGHT:
+        player.y += player_speed
+     if keys[pygame.K_ESCAPE]:
+        menu_state = "main"
+        Inamici.clear()
+        meniu = True
+        running = False
+     if keys[pygame.K_r]:
+        score=0
+        Inamici.clear()
+        player.x=900
+        player.y=450
+        while player.Peste_img.get_width() > (player_img_w * 0.1):
+            player.decrease_size(0.1, 0.1)
+            player_img = player.Peste_img
+     if keys[pygame.K_f]:
+         DISPLAYSURF = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        
+            
+            
+     if diff == "easy":      
+            
+        if len(Inamici) == 0:
+            # spawn Inamici
+            for i in range(3):
+                Inamic = Inamic_Peste(0, random.randrange(0, HEIGHT - 100), random.randint(0, 2))
+                Inamici.append(Inamic)
+        # miscare inamici
+        for Inamic in Inamici[:]:
+            Inamic.move(random.randint(2, 10))
+            # scoate inamici 
+            if Ciocnire(Inamic, player):
+                # verifica daca pestele jucatorului este mai mare decat inamicul ciocnit
+                if player.get_width() > Inamic.get_width():
+                    # previne jucatorul din a deveni prea mare
+                    if player.get_width() < 400:
+                        # creste marimea jucatorului
+                        player.increase_size(0.1, 0.1)
+                        # actualizeaza imaginea
+                        player_img = player.Peste_img
+                    Inamici.remove(Inamic)
+                    if Inamic.get_width() == 25:
+                        score+=5
+                    elif Inamic.get_width() == 100:
+                        score+=10
+                    elif Inamic.get_width() == 200:
+                        score+=20
+                    
+                # daca inamicul este mai mare decat jucatorul
+                else:
+                    if player.Peste_img.get_width() > (player_img_w * 0.1):
+                        # scade marimea jucatorului
+                        player.decrease_size(0.1, 0.1)
+                        # actualizeaza imaginea
+                        player_img = player.Peste_img
+                        Inamici.remove(Inamic)
+                    else:
+                        # Game Over
+                        lost = True
+                        
+            if Inamic.x + Inamic.get_height() > WIDTH:
+                Inamici.remove(Inamic)
+                
+     elif diff == "normal":
+        
+        if len(Inamici) == 0:
+            # spawn Inamici
+            for i in range(4):
+                Inamic = Inamic_Peste(0, random.randrange(0, HEIGHT - 100), random.randint(0, 2))
+                Inamici.append(Inamic)
+        # miscare inamici
+        for Inamic in Inamici[:]:
+            Inamic.move(random.randint(4, 10))
+            # scoate inamici 
+            if Ciocnire(Inamic, player):
+                # verifica daca pestele jucatorului este mai mare decat inamicul ciocnit
+                if player.get_width() > Inamic.get_width():
+                    # previne jucatorul din a deveni prea mare
+                    if player.get_width() < 400:
+                        # creste marimea jucatorului
+                        player.increase_size(0.1, 0.1)
+                        # actualizeaza imaginea
+                        player_img = player.Peste_img
+                    Inamici.remove(Inamic)
+                    if Inamic.get_width() == 25:
+                        score+=10
+                    elif Inamic.get_width() == 100:
+                        score+=15
+                    elif Inamic.get_width() == 200:
+                        score+=30
+                    score_maxy+=score
+                # daca inamicul este mai mare decat jucatorul
+                else:
+                    if player.Peste_img.get_width() > (player_img_w * 0.1):
+                        # scade marimea jucatorului
+                        player.decrease_size(0.1, 0.1)
+                        # actualizeaza imaginea
+                        player_img = player.Peste_img
+                        Inamici.remove(Inamic)
+                    else:
+                        # Game Over
+                        lost = True
+                        
+            if Inamic.x + Inamic.get_height() > WIDTH:
+                Inamici.remove(Inamic)
+                
+     elif diff == "hard":
+        player_speed = 7
+        lista=["0","1","2"]
+        if len(Inamici) == 0:
+            # spawn Inamici
+            for i in range(5):
+                x = random.choices((0,1,2), weights = [10, 16, 5], k = 1)
+                y = x[0]
+                Inamic = Inamic_Peste(0, random.randrange(0, HEIGHT - 100), y)
+                Inamici.append(Inamic)
+                
+        # miscare inamici
+        for Inamic in Inamici[:]:
+            Inamic.move(random.randint(6, 12))
+            # scoate inamici 
+            if Ciocnire(Inamic, player):
+                # verifica daca pestele jucatorului este mai mare decat inamicul ciocnit
+                if player.get_width() > Inamic.get_width():
+                    # previne jucatorul din a deveni prea mare
+                    if player.get_width() < 400:
+                        # creste marimea jucatorului
+                        player.increase_size(0.1, 0.1)
+                        # actualizeaza imaginea
+                        player_img = player.Peste_img
+                    Inamici.remove(Inamic)
+                    if Inamic.get_width() == 25:
+                        score+=15
+                    elif Inamic.get_width() == 100:
+                        score+=30
+                    elif Inamic.get_width() == 200:
+                        score+=60
+                    score_maxy+=score
+                # daca inamicul este mai mare decat jucatorul
+                else:
+                    if player.Peste_img.get_width() > (player_img_w * 0.1):
+                        # scade marimea jucatorului
+                        player.decrease_size(0.1, 0.1)
+                        # actualizeaza imaginea
+                        player_img = player.Peste_img
+                        Inamici.remove(Inamic)
+                    else:
+                        # Game Over
+                        lost = True
+                        
+            if Inamic.x + Inamic.get_height() > WIDTH:
+                Inamici.remove(Inamic)
+
+            
+
+
